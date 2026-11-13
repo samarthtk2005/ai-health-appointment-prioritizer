@@ -1,0 +1,15 @@
+{
+  "name": "otp-verification-demo",
+  "version": "1.0.0",
+  "description": "Simple OTP email verification app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^3.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemailer": "^10.5.0"
+  }
+}

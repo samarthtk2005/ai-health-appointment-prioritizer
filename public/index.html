@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Health Appointment Prioritizer</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --error: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 480px;
+            box-sizing: border-box;
+            margin: 20px;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1, h2 {
+            margin-top: 0;
+            font-weight: 700;
+            color: var(--text-main);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 26px;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+
+        h2 {
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .features-list {
+            margin-bottom: 24px;
+            text-align: left;
+            font-size: 14px;
+            color: var(--text-main);
+            list-style: none;
+            padding: 0;
+        }
+
+        .features-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .features-list li::before {
+            content: "✓";
+            color: var(--success);
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group.full {
+            grid-column: span 2;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 5px;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #message {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            min-height: 20px;
+        }
+
+        .success { color: var(--success); }
+        .error { color: var(--error); }
+
+        .timer {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .timer span {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .success-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        /* Floating Chatbot Styles */
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .chat-toggle-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .chat-toggle-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .chat-box {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            width: 340px;
+            height: 420px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .chat-header {
+            background: var(--primary);
+            color: white;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-chat {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            width: auto;
+            padding: 0;
+            margin: 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f8fafc;
+        }
+
+        .msg {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            line-height: 1.4;
+        }
+
+        .msg.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg.bot {
+            background: #e2e8f0;
+            color: var(--text-main);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 10px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .chat-input-area input {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+            flex: 1;
+            margin-right: 8px;
+        }
+
+        .chat-input-area button {
+            width: auto;
+            padding: 8px 14px;
+            margin-top: 0;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <!-- Landing / Intro View -->
+    <div id="landingView">
+        <h1>AI-Health Appointment Prioritizer</h1>
+        <p class="subtitle">An intelligent clinical queue management & emergency triage platform powered by modern AI.</p>
+        
+        <ul class="features-list">
+            <li>Secure Email OTP Authentication & Summary</li>
+            <li>Dynamic Routine Appointment Queue Re-ordering</li>
+            <li>Emergency Triage & SOS Panic Support</li>
+            <li>Real-time Gemini AI Wellness Assistant</li>
+        </ul>
+
+        <button onclick="showRegistration()">Proceed to Registration</button>
+    </div>
+
+    <!-- Registration & OTP Workflow -->
+    <div id="registrationContainer" class="hidden">
+        <h2>Patient Registration</h2>
+        <p class="subtitle" id="cardSubtitle">Enter your details to register & verify email</p>
+        
+        <div id="step1">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" placeholder="John Doe" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" placeholder="25" min="1" max="120" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="sex">Sex</label>
+                    <select id="sex" required>
+                        <option value="">Select</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="9876543210" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="aadhaar">Identity Card No.</label>
+                    <input type="text" id="aadhaar" placeholder="12-digit number" maxlength="12" required>
+                </div>
+
+                <div class="form-group full">
+                    <label for="location">Location / Address</label>
+                    <input type="text" id="location" placeholder="City or Area" required>
+                </div>
+
+                <div class="form-group full">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="name@example.com" required>
+                </div>
+            </div>
+
+            <button id="sendBtn" onclick="sendOtp()">Submit & Send OTP</button>
+        </div>
+
+        <div id="step2" class="hidden">
+            <div class="timer">Code expires in <span id="countdown">05:00</span></div>
+            <div class="form-group">
+                <label for="otp">Enter 6-Digit Verification Code</label>
+                <input type="text" id="otp" placeholder="123456" maxlength="6" style="letter-spacing: 4px; text-align: center; font-size: 18px; font-weight: bold;">
+            </div>
+            <button id="verifyBtn" onclick="verifyOtp()">Verify & Complete Registration</button>
+        </div>
+
+        <div id="step3" class="hidden">
+            <div class="success-box">
+                <h3 style="color: var(--success); margin-top:0; text-align:center;">Registration Verified!</h3>
+                <p><strong>Name:</strong> <span id="confName"></span></p>
+                <p><strong>Email:</strong> <span id="confEmail"></span></p>
+                <p><strong>Phone:</strong> <span id="confPhone"></span></p>
+                <p><strong>Location:</strong> <span id="confLocation"></span></p>
+            </div>
+            <button style="margin-top: 15px;" onclick="location.reload()">Proceed to Dashboard</button>
+        </div>
+    </div>
+
+    <div id="message"></div>
+</div>
+
+<!-- Gemini AI Floating Chat Widget -->
+<div class="chat-widget">
+    <button class="chat-toggle-btn" onclick="toggleChat()">💬</button>
+    <div id="chatBox" class="chat-box hidden">
+        <div class="chat-header">
+            <span>AI Health Assistant</span>
+            <button class="close-chat" onclick="toggleChat()">&times;</button>
+        </div>
+        <div id="chatMessages" class="chat-messages">
+            <div class="msg bot">Hello! I am your AI health assistant. How can I help you with your health or appointment preparation today?</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="Ask a health question..." onkeypress="handleChatKey(event)">
+            <button onclick="sendChatMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let userEmail = '';
+    let timerInterval;
+
+    function showRegistration() {
+        document.getElementById('landingView').classList.add('hidden');
+        document.getElementById('registrationContainer').classList.remove('hidden');
+    }
+
+    // Chatbot Toggle & Messaging Logic
+    function toggleChat() {
+        const chatBox = document.getElementById('chatBox');
+        chatBox.classList.toggle('hidden');
+    }
+
+    async function sendChatMessage() {
+        const inputField = document.getElementById('chatInput');
+        const message = inputField.value.trim();
+        const chatMessages = document.getElementById('chatMessages');
+
+        if (!message) return;
+
+        chatMessages.innerHTML += `<div class="msg user">${escapeHtml(message)}</div>`;
+        inputField.value = '';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        const loadingId = 'loading-' + Date.now();
+        chatMessages.innerHTML += `<div id="${loadingId}" class="msg bot">Thinking...</div>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+            const data = await response.json();
+
+            document.getElementById(loadingId).remove();
+
+            if (data.success) {
+                chatMessages.innerHTML += `<div class="msg bot">${escapeHtml(data.reply)}</div>`;
+            } else {
+                chatMessages.innerHTML += `<div class="msg bot">Sorry, I encountered an error.</div>`;
+            }
+        } catch (err) {
+            document.getElementById(loadingId).remove();
+            chatMessages.innerHTML += `<div class="msg bot">Network error. Please try again.</div>`;
+        }
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function handleChatKey(event) {
+        if (event.key === 'Enter') {
+            sendChatMessage();
+        }
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // OTP Timers & Flow
+    function startTimer(duration) {
+        let timer = duration, minutes, seconds;
+        const display = document.getElementById('countdown');
+        
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            minutes = parseInt(timer / 60, 10);
+            seconds = parseInt(timer % 60, 10);
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+            display.textContent = minutes + ":" + seconds;
+            if (--timer < 0) {
+                clearInterval(timerInterval);
+                display.textContent = "Expired";
+            }
+        }, 1000);
+    }
+
+    async function sendOtp() {
+        const name = document.getElementById('name').value.trim();
+        const age = document.getElementById('age').value.trim();
+        const sex = document.getElementById('sex').value;
+        const phone = document.getElementById('phone').value.trim();
+        const aadhaar = document.getElementById('aadhaar').value.trim();
+        const location = document.getElementById('location').value.trim();
+        userEmail = document.getElementById('email').value.trim();
+        
+        const msgDiv = document.getElementById('message');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        if (!name || !age || !sex || !phone || !aadhaar || !location || !userEmail) {
+            msgDiv.className = 'error';
+            msgDiv.innerText = 'Please fill out all fields completely.';
+            return;
+        }
+
+        msgDiv.className = '';
+        msgDiv.innerText = 'Sending verification code...';
+        sendBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, age, sex, phone, aadhaar, location, email: userEmail })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                msgDiv.className = 'success';
+                msgDiv.innerText = data.message;
+                document.getElementById('cardSubtitle').innerText = `Verification code sent to ${userEmail}`;
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+                startTimer(300);
+            } else {
+                msgDiv.className = 'error';
+                msgDiv.innerText = data.message;
+                sendBtn.disabled = false;
+            }
+        } catch (err) {
+            msgDiv.className = 'error';
+            msgDiv.innerText = 'Network error. Please try again.';
+            sendBtn.disabled = false;
+        }
+    }
+
+    async function verifyOtp() {
+        const otpCode = document.getElementById('otp').value.trim();
+        const msgDiv = document.getElementById('message');
+
+        if (!otpCode || otpCode.length !== 6) {
+            msgDiv.className = 'error';
+            msgDiv.innerText = 'Please enter a valid 6-digit code.';
+            return;
+        }
+
+        msgDiv.className = '';
+        msgDiv.innerText = 'Verifying...';
+
+        try {
+            const response = await fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userEmail, otp: otpCode })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                clearInterval(timerInterval);
+                msgDiv.className = '';
+                msgDiv.innerText = '';
+                
+                document.getElementById('confName').innerText = data.user.name;
+                document.getElementById('confEmail').innerText = data.user.email;
+                document.getElementById('confPhone').innerText = data.user.phone;
+                document.getElementById('confLocation').innerText = data.user.location;
+
+                document.getElementById('cardSubtitle').innerText = 'Account successfully registered';
+                document.getElementById('step2').classList.add('hidden');
+                document.getElementById('step3').classList.remove('hidden');
+            } else {
+                msgDiv.className = 'error';
+                msgDiv.innerText = data.message;
+            }
+        } catch (err) {
+            msgDiv.className = 'error';
+            msgDiv.innerText = 'Network error. Please try again.';
+        }
+    }
+</script>
+
+</body>
+</html>
