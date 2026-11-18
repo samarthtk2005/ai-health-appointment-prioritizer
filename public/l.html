@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Health Emergency Portal & Voice SOS</title>
+    <!-- Leaflet CSS for Emergency Ambulance Mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --emergency-red: #dc2626;
+            --emergency-dark: #991b1b;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-light: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, var(--emergency-dark), var(--emergency-red));
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dashboard-link {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 6px;
+            padding: 8px 12px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .dashboard-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: var(--card-bg);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #fca5a5;
+            font-size: 1.25rem;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 8px;
+        }
+
+        /* Voice SOS Section */
+        .voice-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 15px;
+        }
+
+        .lang-select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background: #0f172a;
+            color: white;
+            border: 1px solid #475569;
+            font-size: 1rem;
+        }
+
+        .mic-btn {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: var(--emergency-red);
+            color: white;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+            animation: pulse-red 2s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+            transition: transform 0.1s;
+        }
+
+        .mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(220, 38, 38, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
+        .status-text {
+            font-weight: bold;
+            color: #cbd5e1;
+        }
+
+        .transcription-box {
+            width: 100%;
+            min-height: 90px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: left;
+            color: #38bdf8;
+            font-style: italic;
+            font-size: 0.95rem;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        /* Action Buttons Grid */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .action-card-btn {
+            background: #334155;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s, transform 0.2s;
+            text-decoration: none;
+        }
+
+        .action-card-btn:hover {
+            background: #475569;
+            transform: translateY(-2px);
+        }
+
+        .action-card-btn.video-btn {
+            background: #0369a1;
+        }
+        .action-card-btn.video-btn:hover {
+            background: #0284c7;
+        }
+
+        .action-card-btn.dispatch-btn {
+            background: #15803d;
+        }
+        .action-card-btn.dispatch-btn:hover {
+            background: #16a34a;
+        }
+
+        .action-card-btn:disabled {
+            cursor: wait;
+            opacity: 0.7;
+        }
+
+        .meeting-panel {
+            display: grid;
+            gap: 12px;
+            margin-top: 15px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .meeting-note {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+
+        .meeting-panel[hidden],
+        .meeting-join-link[hidden] {
+            display: none;
+        }
+
+        .meeting-join-link {
+            max-width: 360px;
+        }
+
+        /* Map Container */
+        .map-frame {
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 320px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid #475569;
+        }
+
+        .ambulance-icon {
+            background: transparent;
+            border: 0;
+        }
+
+        .ambulance-marker {
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            border-radius: 50%;
+            background: var(--emergency-red);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+            font-size: 29px;
+            line-height: 1;
+        }
+
+        .alert-banner {
+            background: rgba(220, 38, 38, 0.2);
+            border: 1px solid var(--emergency-red);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #fca5a5;
+            font-weight: 500;
+            display: none;
+        }
+
+        .map-status {
+            position: absolute;
+            z-index: 1000;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            max-width: 420px;
+            padding: 8px 10px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #f8fafc;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🚨 AI-Health Emergency & Trauma Dispatch</h1>
+        <a class="dashboard-link" href="/j.html">← Back to dashboard</a>
+    </header>
+
+    <div id="alertBanner" class="alert-banner">
+        ⚠️ <strong>CRITICAL EMERGENCY DETECTED:</strong> Showing a simulated ambulance route to your registered location. This demo does not contact emergency services.
+    </div>
+
+    <div class="container">
+        <!-- Left Panel: Voice SOS & Multilingual Triage -->
+        <div class="panel voice-section">
+            <h2>🎙️ Voice SOS Triage (WebSpeech API)</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem;">Select your preferred language and press the microphone button to speak your symptoms. Allow microphone access when prompted; voice recognition requires Chrome or Edge on localhost or HTTPS.</p>
+            
+            <select id="langSelect" class="lang-select">
+                <option value="en-IN">English (India)</option>
+                <option value="hi-IN">Hindi (हिन्दी)</option>
+                <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+            </select>
+
+            <button id="micBtn" class="mic-btn" type="button" onclick="toggleVoiceSOS()" aria-label="Start voice transcription" title="Start voice transcription">🎤</button>
+            
+            <div id="statusText" class="status-text">Click microphone to start speaking...</div>
+
+            <div style="width: 100%; text-align: left; margin-top: 5px;">
+                <label style="font-size: 0.85rem; color: #94a3b8;">Live Voice Transcript:</label>
+                <div id="transcriptionBox" class="transcription-box" aria-live="polite">Waiting for speech input...</div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Leaflet Map Ambulance Tracker -->
+        <div class="panel">
+            <h2>🚑 Ambulance Route Simulation</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">The registered address is sent to OpenStreetMap Nominatim to find its map coordinates. The ambulance animation is a demo, not a real dispatch.</p>
+            <div class="map-frame">
+                <div id="map"></div>
+                <div id="mapStatus" class="map-status" role="status" aria-live="polite">Looking up your registered location...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Actions Panel -->
+    <div class="panel" style="margin-top: 25px;">
+        <h2>⚡ Emergency Doctor Dispatch & Quick Actions</h2>
+        <div class="actions-grid">
+            <button id="meetingInviteBtn" type="button" class="action-card-btn video-btn" onclick="createEmergencyMeeting()">
+                <span style="font-size: 1.5rem;">📹</span>
+                <span>Invite Dr. Sam to a Video Meeting</span>
+            </button>
+            <button class="action-card-btn dispatch-btn" onclick="simulateAmbulanceDispatch()">
+                <span style="font-size: 1.5rem;">🚨</span>
+                <span>Start Ambulance Route Simulation</span>
+            </button>
+        </div>
+        <p class="meeting-note">Video calls use Jitsi, an external service. Anyone with the meeting link may be able to join, so only share it with the intended participants.</p>
+        <div id="meetingPanel" class="meeting-panel" hidden>
+            <p id="meetingStatus" role="status" aria-live="polite"></p>
+            <a id="meetingJoinLink" class="action-card-btn video-btn meeting-join-link" target="_blank" rel="noopener" hidden>
+                <span style="font-size: 1.5rem;">📹</span>
+                <span>Join the same meeting as Dr. Sam</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const hospitalCoordinates = [12.9716, 77.5946];
+        let map = null;
+        let patientCoordinates = null;
+        let patientMarker = null;
+        let hospitalMarker = null;
+        let ambulanceMarker = null;
+        let routingInterval = null;
+        let locationLookupPromise = null;
+
+        if (window.L) {
+            map = L.map('map').setView(hospitalCoordinates, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            locationLookupPromise = loadRegisteredPatientLocation();
+        } else {
+            document.getElementById('map').textContent = 'The map could not load. Voice transcription is still available.';
+            document.getElementById('mapStatus').textContent = 'The map service is unavailable.';
+        }
+
+        async function createEmergencyMeeting() {
+            const inviteButton = document.getElementById('meetingInviteBtn');
+            const meetingPanel = document.getElementById('meetingPanel');
+            const meetingStatus = document.getElementById('meetingStatus');
+            const meetingLink = document.getElementById('meetingJoinLink');
+            const patientEmail = localStorage.getItem('registeredPatientEmail');
+
+            meetingPanel.hidden = false;
+            meetingLink.hidden = true;
+            if (!patientEmail) {
+                meetingStatus.textContent = 'No registered patient email was found. Please sign in again before requesting a meeting.';
+                return;
+            }
+
+            inviteButton.disabled = true;
+            meetingStatus.textContent = 'Creating a unique meeting link and emailing the invitations...';
+            try {
+                const response = await fetch('/api/emergency-meeting-invite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ patientEmail })
+                });
+                let data;
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    throw new Error(`The meeting service returned HTTP ${response.status} instead of JSON. Start the Node server with "npm start" and open this page from that server.`);
+                }
+                if (!response.ok || !data.success || !data.meetingUrl) {
+                    throw new Error(data.message || 'The meeting invite could not be created.');
+                }
+
+                meetingLink.href = data.meetingUrl;
+                meetingLink.hidden = false;
+                if (data.doctorInviteSent && data.patientInviteSent) {
+                    meetingStatus.textContent = 'The same meeting link was emailed to Dr. Sam and you. Click below to join; the doctor can join from the email.';
+                } else if (data.doctorInviteSent) {
+                    meetingStatus.textContent = 'The doctor received the meeting link, but your email invite could not be sent. Click below to join.';
+                } else if (data.patientInviteSent) {
+                    meetingStatus.textContent = 'Your email invite was sent, but the doctor invite could not be sent. Click below to join and contact the clinic.';
+                } else {
+                    meetingStatus.textContent = 'The meeting link is ready, but the email invitations could not be delivered. Click below to join; please contact the clinic so the doctor can receive the link.';
+                }
+            } catch (error) {
+                meetingStatus.textContent = `Could not create the meeting: ${error.message}`;
+            } finally {
+                inviteButton.disabled = false;
+            }
+        }
+
+        async function loadRegisteredPatientLocation() {
+            const mapStatus = document.getElementById('mapStatus');
+            const location = localStorage.getItem('registeredPatientLocation');
+            if (!location) {
+                mapStatus.textContent = 'No registered address was found. Sign in and complete registration to display a location.';
+                return;
+            }
+
+            mapStatus.textContent = 'Finding the location saved during registration...';
+            try {
+                const normalizedLocation = location.trim().toLowerCase();
+                const cachedText = localStorage.getItem('registeredPatientCoordinates');
+                let data = null;
+                if (cachedText) {
+                    try {
+                        const cached = JSON.parse(cachedText);
+                        if (cached.location === normalizedLocation &&
+                            Number.isFinite(Number(cached.latitude)) &&
+                            Number.isFinite(Number(cached.longitude))) {
+                            data = cached;
+                        }
+                    } catch (error) {
+                        throw new Error('Saved map coordinates are invalid. Clear this site’s saved data and try again.');
+                    }
+                }
+
+                if (!data) {
+                    const url = new URL('https://nominatim.openstreetmap.org/search');
+                    url.searchParams.set('format', 'jsonv2');
+                    url.searchParams.set('limit', '1');
+                    url.searchParams.set('q', location);
+                    const response = await fetch(url.toString(), {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) {
+                        throw new Error(`OpenStreetMap location lookup failed (HTTP ${response.status}).`);
+                    }
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) {
+                        throw new Error('OpenStreetMap returned an unexpected response. Check your internet connection and try again.');
+                    }
+
+                    let results;
+                    try {
+                        results = await response.json();
+                    } catch (error) {
+                        throw new Error('OpenStreetMap returned invalid location data. Please try again later.');
+                    }
+                    if (!Array.isArray(results) || !results[0]) {
+                        throw new Error('No matching location was found. Check the address saved during registration.');
+                    }
+
+                    data = {
+                        location: normalizedLocation,
+                        latitude: Number(results[0].lat),
+                        longitude: Number(results[0].lon),
+                        displayName: results[0].display_name
+                    };
+                    localStorage.setItem('registeredPatientCoordinates', JSON.stringify(data));
+                }
+
+                const latitude = Number(data.latitude);
+                const longitude = Number(data.longitude);
+                if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+                    latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+                    throw new Error('The location service returned invalid coordinates.');
+                }
+
+                patientCoordinates = [latitude, longitude];
+                patientMarker = L.marker(patientCoordinates).addTo(map)
+                    .bindPopup('Registered location')
+                    .openPopup();
+                map.setView(patientCoordinates, 14);
+                mapStatus.textContent = `Map centered on registered location: ${data.displayName || location}`;
+            } catch (error) {
+                mapStatus.textContent = `Could not locate the registered address: ${error.message}`;
+            }
+        }
+
+        async function simulateAmbulanceDispatch() {
+            if (!map) {
+                document.getElementById('statusText').textContent = 'The map is unavailable, so the dispatch simulation could not start.';
+                return;
+            }
+
+            if (!patientCoordinates && locationLookupPromise) {
+                await locationLookupPromise;
+            }
+            if (!patientCoordinates) {
+                document.getElementById('statusText').textContent = 'The registered location is not available, so the route simulation could not start.';
+                return;
+            }
+
+            document.getElementById('alertBanner').style.display = 'block';
+            document.getElementById('mapStatus').textContent = 'Simulating the route from the hospital to your registered location.';
+
+            if (routingInterval) {
+                clearInterval(routingInterval);
+            }
+            if (ambulanceMarker) {
+                map.removeLayer(ambulanceMarker);
+            }
+
+            if (!hospitalMarker) {
+                hospitalMarker = L.marker(hospitalCoordinates).addTo(map)
+                    .bindPopup('AI-Health Central City Hospital');
+            }
+            map.fitBounds([hospitalCoordinates, patientCoordinates], { padding: [35, 35] });
+
+            let step = 0;
+            const totalSteps = 40;
+            ambulanceMarker = L.marker(hospitalCoordinates, {
+                icon: L.divIcon({
+                    className: 'ambulance-icon',
+                    html: '<span class="ambulance-marker" aria-label="Ambulance">🚑</span>',
+                    iconSize: [46, 46],
+                    iconAnchor: [23, 23],
+                    popupAnchor: [0, -23]
+                })
+            }).addTo(map).bindPopup('Ambulance route simulation in progress').openPopup();
+
+            routingInterval = setInterval(() => {
+                step++;
+                const progress = step / totalSteps;
+                const latitude = hospitalCoordinates[0] + (patientCoordinates[0] - hospitalCoordinates[0]) * progress;
+                const longitude = hospitalCoordinates[1] + (patientCoordinates[1] - hospitalCoordinates[1]) * progress;
+                ambulanceMarker.setLatLng([latitude, longitude]);
+
+                if (step >= totalSteps) {
+                    clearInterval(routingInterval);
+                    ambulanceMarker.bindPopup('Ambulance reached the registered location (simulation)').openPopup();
+                    map.panTo(patientCoordinates);
+                    document.getElementById('mapStatus').textContent = 'The simulated ambulance reached your registered location.';
+                }
+            }, 500);
+
+            alert('Ambulance route simulation started. This demo does not contact emergency services.');
+        }
+
+        // WebSpeech API Voice SOS Logic
+        let isListening = false;
+        let recognition = null;
+        let recognitionErrorMessage = '';
+        let criticalTranscriptDetected = false;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        function toggleVoiceSOS() {
+            if (!SpeechRecognition) {
+                document.getElementById('statusText').textContent = 'Speech recognition is not supported in this browser. Please use Chrome or Edge.';
+                return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
+            const lang = document.getElementById('langSelect').value;
+            const statusText = document.getElementById('statusText');
+            const transcriptionBox = document.getElementById('transcriptionBox');
+            const micBtn = document.getElementById('micBtn');
+
+            recognition = new SpeechRecognition();
+            recognition.lang = lang;
+            recognition.interimResults = true;
+            recognition.continuous = false;
+            recognition.maxAlternatives = 1;
+            recognitionErrorMessage = '';
+            criticalTranscriptDetected = false;
+            transcriptionBox.textContent = 'Listening...';
+            statusText.textContent = 'Starting microphone...';
+            micBtn.setAttribute('aria-label', 'Stop voice transcription');
+            micBtn.title = 'Stop voice transcription';
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.style.background = '#15803d';
+                statusText.innerText = "Listening... Speak now.";
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                let finalTranscript = '';
+                for (let index = 0; index < event.results.length; index++) {
+                    const result = event.results[index];
+                    const resultText = result[0].transcript;
+                    transcript += `${resultText} `;
+                    if (result.isFinal) {
+                        finalTranscript += `${resultText} `;
+                    }
+                }
+                transcriptionBox.textContent = transcript.trim();
+                if (finalTranscript.trim()) {
+                    analyzeEmergencyTranscript(finalTranscript.trim());
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                const errorMessages = {
+                    'not-allowed': 'Microphone access was denied. Allow microphone access in your browser and try again.',
+                    'service-not-allowed': 'The browser blocked speech recognition. Check microphone and site permissions.',
+                    'audio-capture': 'No microphone was found. Connect a microphone and try again.',
+                    'no-speech': 'No speech was detected. Press the microphone and speak again.',
+                    'network': 'Speech recognition needs a network connection. Check your connection and try again.',
+                    'aborted': 'Voice transcription was stopped.'
+                };
+                recognitionErrorMessage = errorMessages[event.error] || `Speech recognition failed (${event.error}). Please try again.`;
+                statusText.textContent = recognitionErrorMessage;
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.style.background = '#dc2626';
+                micBtn.setAttribute('aria-label', 'Start voice transcription');
+                micBtn.title = 'Start voice transcription';
+                if (!recognitionErrorMessage && !criticalTranscriptDetected) {
+                    statusText.textContent = transcriptionBox.textContent === 'Listening...'
+                        ? 'No speech was captured. Press the microphone and try again.'
+                        : 'Transcript ready. Press the microphone to record again.';
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (error) {
+                isListening = false;
+                recognitionErrorMessage = error.message || 'The microphone could not be started. Check browser permissions and try again.';
+                statusText.textContent = recognitionErrorMessage;
+                micBtn.setAttribute('aria-label', 'Start voice transcription');
+                micBtn.title = 'Start voice transcription';
+            }
+        }
+
+        function analyzeEmergencyTranscript(text) {
+            const criticalKeywords = [
+                'chest pain', 'breathlessness', 'bleeding', 'unconscious', 
+                'heart attack', 'severe pain', 'accident', 'heart', 'bp',
+                'ಉಸಿರಾಟ', 'ಎದೆ ನೋವು', 'ರಕ್ತಸ್ರಾವ', 'छाती में दर्द', 'सांस लेने में तकलीफ'
+            ];
+            
+            const lowerText = text.toLowerCase();
+            const isCritical = criticalKeywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
+
+            if (isCritical) {
+                criticalTranscriptDetected = true;
+                document.getElementById('statusText').innerHTML = "<span style='color: #fca5a5;'>🚨 Critical symptoms detected. Starting the route simulation...</span>";
+                simulateAmbulanceDispatch();
+            } else {
+                document.getElementById('statusText').innerHTML = "<span style='color: #4ade80;'>✓ Symptoms recorded. Processing priority tier.</span>";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory storage for pending OTP registrations
 const pendingRegistrations = new Map();
+const meetingInviteCooldowns = new Map();
 
 // Configure Nodemailer transporter using Gmail App Passwords
 const transporter = nodemailer.createTransport({
@@ -195,6 +197,91 @@ app.post('/api/send-appointment-email', async (req, res) => {
         console.error('Error sending confirmation email:', error);
         res.status(500).json({ success: false, message: 'Failed to send confirmation email.' });
     }
+});
+
+app.post('/api/emergency-meeting-invite', async (req, res) => {
+    const patientEmail = typeof req.body.patientEmail === 'string' ? req.body.patientEmail.trim() : '';
+    const doctorEmail = typeof process.env.DOCTOR_EMAIL === 'string' ? process.env.DOCTOR_EMAIL.trim() : '';
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(patientEmail)) {
+        return res.status(400).json({ success: false, message: 'A valid registered patient email is required.' });
+    }
+    if (!emailPattern.test(doctorEmail)) {
+        return res.status(503).json({ success: false, message: 'Doctor email is not configured. Add DOCTOR_EMAIL to the server environment and restart the server.' });
+    }
+
+    const usersPath = path.join(__dirname, 'users.json');
+    let users;
+    try {
+        users = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+    } catch (error) {
+        console.error('Could not read registered patients for meeting invite:', error.message);
+        return res.status(500).json({ success: false, message: 'Registered patient details could not be loaded.' });
+    }
+    if (!Array.isArray(users)) {
+        return res.status(500).json({ success: false, message: 'Registered patient records are invalid.' });
+    }
+
+    const patient = users.find(user =>
+        user && typeof user.email === 'string' && user.email.toLowerCase() === patientEmail.toLowerCase()
+    );
+    if (!patient) {
+        return res.status(403).json({ success: false, message: 'This email does not match a registered patient.' });
+    }
+
+    const normalizedEmail = patient.email.toLowerCase();
+    const now = Date.now();
+    const nextAllowedAt = meetingInviteCooldowns.get(normalizedEmail) || 0;
+    if (now < nextAllowedAt) {
+        return res.status(429).json({ success: false, message: 'A meeting invite was just requested. Please wait a minute before trying again.' });
+    }
+    meetingInviteCooldowns.set(normalizedEmail, now + 60 * 1000);
+
+    const meetingUrl = `https://meet.jit.si/AI-Health-Emergency-${crypto.randomBytes(16).toString('hex')}`;
+    const doctorMail = {
+        from: process.env.EMAIL_USER,
+        to: doctorEmail,
+        subject: 'AI-Health emergency video meeting invitation',
+        text: `Dr. Sam,\n\n` +
+              `${patient.name} has requested an emergency video consultation.\n\n` +
+              `Join the meeting: ${meetingUrl}\n\n` +
+              `The patient has received the same meeting link.`
+    };
+    const patientMail = {
+        from: process.env.EMAIL_USER,
+        to: patient.email,
+        subject: 'Join your AI-Health video consultation',
+        text: `Hello ${patient.name},\n\n` +
+              `Dr. Sam has been invited to your video consultation.\n\n` +
+              `Join the meeting: ${meetingUrl}\n\n` +
+              `This link is shared with the doctor so you can meet in the same room.`
+    };
+
+    const [doctorResult, patientResult] = await Promise.allSettled([
+        transporter.sendMail(doctorMail),
+        transporter.sendMail(patientMail)
+    ]);
+    const doctorInviteSent = doctorResult.status === 'fulfilled';
+    const patientInviteSent = patientResult.status === 'fulfilled';
+
+    if (!doctorInviteSent) {
+        console.error('Could not send emergency meeting invite to doctor:', doctorResult.reason);
+    }
+    if (!patientInviteSent) {
+        console.error('Could not send emergency meeting invite to patient:', patientResult.reason);
+    }
+    if (!doctorInviteSent && !patientInviteSent) {
+        meetingInviteCooldowns.delete(normalizedEmail);
+        return res.status(502).json({ success: false, message: 'Meeting invitations could not be emailed. Check the email server settings and try again.' });
+    }
+
+    return res.json({
+        success: true,
+        meetingUrl,
+        doctorInviteSent,
+        patientInviteSent
+    });
 });
 
 // Endpoint: Queue Sorting & Management Example Route
