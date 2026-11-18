@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Health Portal - 4-Doctor Multi-Lane Queue</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-color);
+            margin: 0;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1e1b4b;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #312e81;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #818cf8;
+        }
+
+        .back-btn {
+            background: #312e81;
+            border: 1px solid #6366f1;
+            color: #e0e7ff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 30px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            box-sizing: border-box;
+            width: 90%;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 24px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+
+        .action-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            font-size: 15px;
+            transition: background 0.2s;
+            margin-top: 5px;
+        }
+
+        .action-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .queue-box {
+            margin-top: 30px;
+            border-top: 2px solid #f1f5f9;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Multi-Doctor Clinical Triage Queue</h1>
+            <span id="userGreeting" style="font-size: 13px; color: #c7d2fe;">Loading...</span>
+        </div>
+        <a href="/j.html" class="back-btn">← Back to Dashboard</a>
+    </header>
+
+    <div class="container">
+        <h2>Symptom Severity Triage & Specialist Assignment</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
+            Our facility assigns <strong>4 dedicated specialists</strong> across your 4 symptom sections (9:00 AM - 9:00 PM slots).
+        </p>
+
+        <div>
+            <label for="symptomSelect">Primary Symptom / Condition Section & Doctor</label>
+            <select id="symptomSelect">
+                <option value="mild">Mild Fever / Cough / Cold ➔ Dr. Ramesh Rao (General Care)</option>
+                <option value="moderate">Moderate Injury / Persistent Pain ➔ Dr. Priya Nair (Orthopedics & Pain)</option>
+                <option value="severe">Severe Breathing Difficulty / High Fever ➔ Dr. Vikram Patel (Pulmonology)</option>
+                <option value="critical">Critical Trauma / Acute Risk ➔ Dr. Ananya Sharma (Emergency & Trauma)</option>
+            </select>
+
+            <label for="painScale">Pain Severity Scale (1 - 10): <span id="painValue" style="color: var(--primary);">3</span>/10</label>
+            <input type="range" id="painScale" min="1" max="10" value="3" oninput="document.getElementById('painValue').innerText = this.value">
+
+            <button class="action-btn" onclick="submitAppointment()">Compute Priority & Join Specialist Lane</button>
+            <button onclick="loadSamplePatients()" style="background: #334155; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; width: 100%; font-size: 14px; margin-top: 10px; transition: background 0.2s;">
+                ⚡ Load Multi-Doctor Sample Patients
+            </button>
+        </div>
+
+        <div class="queue-box">
+            <h3 style="font-size: 18px; color: var(--text-main); margin-bottom: 15px;">Live Multi-Lane Clinical Queues</h3>
+            <div id="queueList" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto;">
+                <p style="color: var(--text-muted); font-size: 14px; font-style: italic;">No active appointments in the queue yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let clinicalQueue = JSON.parse(localStorage.getItem('sharedClinicalQueue')) || [];
+        const HOSPITAL_NAME = "AI-Health Bengaluru City Hospital";
+
+        const doctorMapping = {
+            'mild': { name: "Dr. Ramesh Rao", specialization: "General Care" },
+            'moderate': { name: "Dr. Priya Nair", specialization: "Orthopedics & Pain" },
+            'severe': { name: "Dr. Vikram Patel", specialization: "Pulmonology" },
+            'critical': { name: "Dr. Ananya Sharma", specialization: "Emergency & Trauma" }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const userName = localStorage.getItem('registeredPatientName');
+            if (!userName) {
+                window.location.href = '/index.html';
+                return;
+            }
+            document.getElementById('userGreeting').innerText = `Logged in as: ${userName}`;
+            renderQueue();
+        });
+
+        function submitAppointment() {
+            const userName = localStorage.getItem('registeredPatientName') || 'Patient';
+            const userEmail = localStorage.getItem('registeredPatientEmail') || '';
+            const symptomVal = document.getElementById('symptomSelect').value;
+            const painVal = parseInt(document.getElementById('painScale').value);
+
+            let baseSeverity = 10;
+            if (symptomVal === 'moderate') baseSeverity = 30;
+            if (symptomVal === 'severe') baseSeverity = 60;
+            if (symptomVal === 'critical') baseSeverity = 90;
+
+            const priorityScore = baseSeverity + (painVal * 2);
+            const assignedDoctor = doctorMapping[symptomVal];
+
+            const existingIndex = clinicalQueue.findIndex(q => q.name === userName);
+            const newAppointment = {
+                name: userName,
+                symptom: symptomVal,
+                symptomDisplay: symptomVal.toUpperCase(),
+                pain: painVal,
+                score: priorityScore,
+                hospital: HOSPITAL_NAME,
+                doctorName: assignedDoctor.name,
+                doctorSpec: assignedDoctor.specialization
+            };
+
+            if (existingIndex >= 0) {
+                clinicalQueue[existingIndex] = newAppointment;
+            } else {
+                clinicalQueue.push(newAppointment);
+            }
+
+            let categorizedLanes = { mild: [], moderate: [], severe: [], critical: [] };
+            clinicalQueue.forEach(item => {
+                if (categorizedLanes[item.symptom]) {
+                    categorizedLanes[item.symptom].push(item);
+                } else {
+                    categorizedLanes.mild.push(item);
+                }
+            });
+
+            let finalizedQueue = [];
+            let baseMinutes = 9 * 60; 
+            const maxSlotsPerDay = 36;
+            const todayObj = new Date();
+            const tomorrowObj = new Date();
+            tomorrowObj.setDate(todayObj.getDate() + 1);
+            const options = { month: 'short', day: 'numeric' };
+            const todayStr = todayObj.toLocaleDateString('en-US', options);
+            const tomorrowStr = tomorrowObj.toLocaleDateString('en-US', options);
+
+            Object.keys(categorizedLanes).forEach(cat => {
+                let lane = categorizedLanes[cat];
+                lane.sort((a, b) => b.score - a.score);
+
+                lane.forEach((item, index) => {
+                    const dayOffset = Math.floor(index / maxSlotsPerDay);
+                    const slotIndexInDay = index % maxSlotsPerDay;
+                    let assignedMinutes = baseMinutes + (slotIndexInDay * 20);
+
+                    const hours = Math.floor(assignedMinutes / 60);
+                    const mins = assignedMinutes % 60;
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+                    const formattedMins = mins < 10 ? '0' + mins : mins;
+
+                    item.timeSlot = `${formattedHours}:${formattedMins} ${ampm} — ${dayOffset === 0 ? `Today (${todayStr})` : `Tomorrow (${tomorrowStr})`}`;
+                    finalizedQueue.push(item);
+                });
+            });
+
+            clinicalQueue = finalizedQueue;
+            localStorage.setItem('sharedClinicalQueue', JSON.stringify(clinicalQueue));
+
+            const myRecord = clinicalQueue.find(q => q.name === userName);
+            if (myRecord) {
+                localStorage.setItem('activeAppointment', `${myRecord.symptomDisplay} (Score: ${myRecord.score}) — ${myRecord.timeSlot} | Dr. ${myRecord.doctorName}`);
+                localStorage.setItem('assignedDoctor', `${myRecord.doctorName} (${myRecord.doctorSpec})`);
+            }
+
+            renderQueue();
+
+            if (userEmail) {
+                fetch('/api/send-appointment-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: userEmail,
+                        name: userName,
+                        appointmentDetails: `${myRecord.symptomDisplay} (Score: ${myRecord.score}) — ${myRecord.timeSlot}`,
+                        hospitalName: HOSPITAL_NAME,
+                        doctorName: `${myRecord.doctorName} (${myRecord.doctorSpec})`,
+                        symptomCategory: myRecord.symptom
+                    })
+                })
+                .then(res => res.json())
+                .then(data => console.log('Email status:', data.message))
+                .catch(err => console.error('Email error:', err));
+            }
+
+            alert(`Appointment booked successfully!\nHospital: ${HOSPITAL_NAME}\nSpecialist: Dr. ${myRecord.doctorName} (${myRecord.doctorSpec})\nAssigned Slot: ${myRecord.timeSlot}\n\n📧 Confirmation email sent!`);
+        }
+
+        function loadSamplePatients() {
+            const sampleBatch = [
+                { name: "Rahul Sharma", symptom: "mild", symptomDisplay: "MILD FEVER", pain: 2, score: 14, hospital: HOSPITAL_NAME, doctorName: "Dr. Ramesh Rao", doctorSpec: "General Care" },
+                { name: "Priya Ramesh", symptom: "critical", symptomDisplay: "CRITICAL TRAUMA", pain: 9, score: 108, hospital: HOSPITAL_NAME, doctorName: "Dr. Ananya Sharma", doctorSpec: "Emergency & Trauma" },
+                { name: "Amit Patel", symptom: "moderate", symptomDisplay: "MODERATE INJURY", pain: 6, score: 42, hospital: HOSPITAL_NAME, doctorName: "Dr. Priya Nair", doctorSpec: "Orthopedics & Pain" },
+                { name: "Sneha Rao", symptom: "severe", symptomDisplay: "SEVERE BREATHING", pain: 8, score: 76, hospital: HOSPITAL_NAME, doctorName: "Dr. Vikram Patel", doctorSpec: "Pulmonology" }
+            ];
+
+            sampleBatch.forEach(sample => {
+                if (!clinicalQueue.some(q => q.name === sample.name)) {
+                    clinicalQueue.push(sample);
+                }
+            });
+
+            localStorage.setItem('sharedClinicalQueue', JSON.stringify(clinicalQueue));
+            renderQueue();
+            alert('Sample patients loaded across all 4 specialist doctors!');
+        }
+
+        function renderQueue() {
+            const queueContainer = document.getElementById('queueList');
+            if (clinicalQueue.length === 0) {
+                queueContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 14px; font-style: italic;">No active appointments in the queue yet.</p>`;
+                return;
+            }
+
+            let html = '';
+            clinicalQueue.forEach((item, index) => {
+                const isMe = item.name === localStorage.getItem('registeredPatientName');
+                const docName = item.doctorName || (doctorMapping[item.symptom] ? doctorMapping[item.symptom].name : "Dr. Ananya Sharma");
+                const docSpec = item.doctorSpec || (doctorMapping[item.symptom] ? doctorMapping[item.symptom].specialization : "Specialist");
+
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: ${isMe ? '#e0e7ff' : '#f1f5f9'}; padding: 12px 16px; border-radius: 10px; border-left: 5px solid var(--primary);">
+                        <div>
+                            <strong style="font-size: 14px; color: var(--text-main);">${index + 1}. ${escapeHtml(item.name)}</strong> ${isMe ? '(You)' : ''}
+                            <div style="font-size: 12px; color: var(--text-muted);">Condition: ${item.symptomDisplay || item.symptom} | Pain: ${item.pain}/10</div>
+                            <div style="font-size: 11px; color: #4338ca; margin-top: 3px; font-weight: 600;">🏥 ${item.hospital || HOSPITAL_NAME} | 👨‍⚕️ ${docName} (${docSpec})</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;">${item.timeSlot || '9:00 AM'}</span>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">Score: ${item.score}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            queueContainer.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>

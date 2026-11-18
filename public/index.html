@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI-Health Appointment Prioritizer</title>
+    <title>AI-Health Appointment Prioritizer - Registration</title>
     <style>
         :root {
             --primary: #4f46e5;
@@ -192,6 +192,7 @@
             padding: 20px;
             border-radius: 8px;
             text-align: left;
+            margin-bottom: 15px;
         }
 
         /* Floating Chatbot Styles */
@@ -275,6 +276,7 @@
             padding: 8px 12px;
             border-radius: 8px;
             line-height: 1.4;
+            white-space: pre-wrap;
         }
 
         .msg.user {
@@ -362,7 +364,7 @@
 
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" placeholder="9876543210" required>
+                    <input type="tel" id="phone" placeholder="9876543210" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required>
                 </div>
 
                 <div class="form-group">
@@ -388,7 +390,7 @@
             <div class="timer">Code expires in <span id="countdown">05:00</span></div>
             <div class="form-group">
                 <label for="otp">Enter 6-Digit Verification Code</label>
-                <input type="text" id="otp" placeholder="123456" maxlength="6" style="letter-spacing: 4px; text-align: center; font-size: 18px; font-weight: bold;">
+                <input type="text" id="otp" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="letter-spacing: 4px; text-align: center; font-size: 18px; font-weight: bold;" required>
             </div>
             <button id="verifyBtn" onclick="verifyOtp()">Verify & Complete Registration</button>
         </div>
@@ -401,7 +403,7 @@
                 <p><strong>Phone:</strong> <span id="confPhone"></span></p>
                 <p><strong>Location:</strong> <span id="confLocation"></span></p>
             </div>
-            <button style="margin-top: 15px;" onclick="location.reload()">Proceed to Dashboard</button>
+            <button onclick="goToDashboard()">Proceed to Dashboard</button>
         </div>
     </div>
 
@@ -429,13 +431,46 @@
 <script>
     let userEmail = '';
     let timerInterval;
+    let chatHistory = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const phoneInput = document.getElementById('phone');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            });
+        }
+    });
 
     function showRegistration() {
         document.getElementById('landingView').classList.add('hidden');
         document.getElementById('registrationContainer').classList.remove('hidden');
+        
+        document.getElementById('step1').classList.remove('hidden');
+        document.getElementById('step2').classList.add('hidden');
+        document.getElementById('step3').classList.add('hidden');
+
+        const allInputs = document.querySelectorAll('#registrationContainer input, #registrationContainer select');
+        allInputs.forEach(input => {
+            if (input.type === 'select-one') {
+                input.selectedIndex = 0;
+            } else {
+                input.value = '';
+            }
+        });
+
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) sendBtn.disabled = false;
+
+        const msgDiv = document.getElementById('message');
+        if (msgDiv) {
+            msgDiv.className = '';
+            msgDiv.innerText = '';
+        }
+
+        document.getElementById('cardSubtitle').innerText = 'Enter your details to register & verify email';
     }
 
-    // Chatbot Toggle & Messaging Logic
     function toggleChat() {
         const chatBox = document.getElementById('chatBox');
         chatBox.classList.toggle('hidden');
@@ -448,32 +483,98 @@
 
         if (!message) return;
 
-        chatMessages.innerHTML += `<div class="msg user">${escapeHtml(message)}</div>`;
+        const userMessage = document.createElement('div');
+        userMessage.className = 'msg user';
+        userMessage.textContent = message;
+        chatMessages.appendChild(userMessage);
         inputField.value = '';
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
-        const loadingId = 'loading-' + Date.now();
-        chatMessages.innerHTML += `<div id="${loadingId}" class="msg bot">Thinking...</div>`;
+        const replyElement = document.createElement('div');
+        replyElement.className = 'msg bot';
+        replyElement.textContent = 'Thinking...';
+        chatMessages.appendChild(replyElement);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+        const previousMessages = chatHistory.slice(-8);
+        let streamCompleted = false;
+        let hasReplyContent = false;
+        const controller = new AbortController();
+        const requestTimeout = setTimeout(() => controller.abort(), 70000);
 
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
+                body: JSON.stringify({ message, history: previousMessages }),
+                signal: controller.signal
             });
-            const data = await response.json();
 
-            document.getElementById(loadingId).remove();
-
-            if (data.success) {
-                chatMessages.innerHTML += `<div class="msg bot">${escapeHtml(data.reply)}</div>`;
+            if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
+                const data = await response.json();
+                replyElement.textContent = data.message || 'Sorry, I encountered an error.';
             } else {
-                chatMessages.innerHTML += `<div class="msg bot">Sorry, I encountered an error.</div>`;
+                replyElement.textContent = '';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                const handleEvent = eventText => {
+                    const lines = eventText.split(/\r?\n/);
+                    const eventType = lines.find(line => line.startsWith('event:'))?.slice(6).trim();
+                    const dataText = lines
+                        .filter(line => line.startsWith('data:'))
+                        .map(line => line.slice(5).trimStart())
+                        .join('\n');
+
+                    if (!dataText) return;
+                    const data = JSON.parse(dataText);
+                    if (eventType === 'done') {
+                        streamCompleted = true;
+                    } else if (eventType === 'status') {
+                        replyElement.textContent = data.message;
+                    } else if (eventType === 'error') {
+                        replyElement.textContent = hasReplyContent
+                            ? `${replyElement.textContent}\n${data.message}`.trim()
+                            : data.message;
+                    } else if (data.text) {
+                        if (!hasReplyContent) {
+                            replyElement.textContent = '';
+                            hasReplyContent = true;
+                        }
+                        replyElement.textContent += data.text;
+                    }
+                };
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    buffer += decoder.decode(value, { stream: !done });
+                    const events = buffer.split(/\r?\n\r?\n/);
+                    buffer = events.pop();
+                    events.forEach(handleEvent);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    if (done) break;
+                }
+
+                if (buffer.trim()) handleEvent(buffer);
+                if (!replyElement.textContent) {
+                    replyElement.textContent = 'No response received. Please try again.';
+                }
             }
         } catch (err) {
-            document.getElementById(loadingId).remove();
-            chatMessages.innerHTML += `<div class="msg bot">Network error. Please try again.</div>`;
+            replyElement.textContent = err.name === 'AbortError'
+                ? 'The health assistant took too long to respond. Please try again.'
+                : 'Network error. Please try again.';
+        } finally {
+            clearTimeout(requestTimeout);
+        }
+        if (streamCompleted && replyElement.textContent.trim()) {
+            chatHistory.push(
+                { role: 'user', text: message },
+                { role: 'model', text: replyElement.textContent.trim() }
+            );
+            if (chatHistory.length > 8) {
+                chatHistory = chatHistory.slice(-8);
+            }
         }
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -488,7 +589,6 @@
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // OTP Timers & Flow
     function startTimer(duration) {
         let timer = duration, minutes, seconds;
         const display = document.getElementById('countdown');
@@ -522,6 +622,13 @@
         if (!name || !age || !sex || !phone || !aadhaar || !location || !userEmail) {
             msgDiv.className = 'error';
             msgDiv.innerText = 'Please fill out all fields completely.';
+            return;
+        }
+
+        if (phone.length !== 10) {
+            msgDiv.className = 'error';
+            msgDiv.innerText = 'Please enter a valid 10-digit phone number.';
+            document.getElementById('phone').focus();
             return;
         }
 
@@ -582,6 +689,20 @@
                 msgDiv.className = '';
                 msgDiv.innerText = '';
                 
+                // CRITICAL SESSION CLEANUP: Remove old session keys before storing new user
+                localStorage.removeItem('registeredPatientName');
+                localStorage.removeItem('registeredPatientEmail');
+                localStorage.removeItem('registeredPatientPhone');
+                localStorage.removeItem('registeredPatientLocation');
+                localStorage.removeItem('activeAppointment');
+                localStorage.removeItem('assignedDoctor');
+
+                // Save new user session details
+                localStorage.setItem('registeredPatientName', data.user.name);
+                localStorage.setItem('registeredPatientEmail', data.user.email);
+                localStorage.setItem('registeredPatientPhone', data.user.phone);
+                localStorage.setItem('registeredPatientLocation', data.user.location);
+
                 document.getElementById('confName').innerText = data.user.name;
                 document.getElementById('confEmail').innerText = data.user.email;
                 document.getElementById('confPhone').innerText = data.user.phone;
@@ -598,6 +719,10 @@
             msgDiv.className = 'error';
             msgDiv.innerText = 'Network error. Please try again.';
         }
+    }
+
+    function goToDashboard() {
+        window.location.href = '/j.html';
     }
 </script>
 

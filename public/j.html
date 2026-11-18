@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Health Portal - Dashboard & Triage</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --emergency: #dc2626;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-color);
+            margin: 0;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1e1b4b;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #312e81;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #818cf8;
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .profile-btn {
+            background: #312e81;
+            border: 1px solid #6366f1;
+            color: #e0e7ff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .profile-btn:hover {
+            background: #4338ca;
+            color: white;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        .sos-header-btn {
+            background-color: var(--emergency);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px 30px;
+            max-width: 1200px;
+            margin: auto;
+            flex: 1;
+            box-sizing: border-box;
+            width: 100%;
+            align-items: center;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .section-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 22px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 12px;
+        }
+
+        .emergency-section {
+            border: 2px solid #fecaca;
+            background: #fff5f5;
+        }
+
+        .emergency-section h2 {
+            color: var(--emergency);
+            border-bottom-color: #fee2e2;
+        }
+
+        .action-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .emergency-btn {
+            background-color: var(--emergency);
+        }
+        .emergency-btn:hover {
+            background-color: #b91c1c;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            box-sizing: border-box;
+            position: relative;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 20px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 1px dashed #e2e8f0;
+            padding-bottom: 6px;
+        }
+
+        .detail-row span:first-child {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .detail-row span:last-child {
+            font-weight: 500;
+            color: var(--text-main);
+            text-align: right;
+        }
+
+        .close-modal-btn {
+            background: #64748b;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .close-modal-btn:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>AI-Health Portal</h1>
+        </div>
+        <div class="nav-actions">
+            <button class="sos-header-btn" onclick="triggerEmergencySOS()">🚨 EMERGENCY SOS</button>
+            <button class="profile-btn" onclick="toggleProfileModal()">👤 My Profile & Appointment</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+        
+        <div class="section-card">
+            <div>
+                <h2>📅 Routine Appointments & Live Queue</h2>
+                <p style="color: var(--text-muted); line-height: 1.5;">Select your symptoms, view your AI-weighted priority score, and check your real-time position in the live clinical queue.</p>
+            </div>
+            <div id="appointmentModule">
+                <button class="action-btn" onclick="window.location.href='/k.html'">Book Appointment / Check Queue</button>
+            </div>
+        </div>
+
+        <div class="section-card emergency-section">
+            <div>
+                <h2>🚨 Emergency Triage & Panic Support</h2>
+                <p style="color: #7f1d1d; line-height: 1.5;">For critical care, chest pain, acute trauma, or breathlessness. Activate the 3-state voice triage assistant for instant dispatch.</p>
+            </div>
+            <div>
+                <button class="action-btn emergency-btn" onclick="openEmergencyTriage()">
+                    Start Voice SOS Triage
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="profileModal" class="modal-overlay" onclick="handleModalClick(event)">
+        <div class="modal-card">
+            <h3>Patient Profile & Assigned Specialist</h3>
+            
+            <div style="margin-top: 15px;">
+                <div class="detail-row">
+                    <span>Full Name:</span>
+                    <span id="profileName">-</span>
+                </div>
+                <div class="detail-row">
+                    <span>Phone Number:</span>
+                    <span id="profilePhone">-</span>
+                </div>
+                <div class="detail-row">
+                    <span>Email Address:</span>
+                    <span id="profileEmail">-</span>
+                </div>
+                <div class="detail-row">
+                    <span>Location:</span>
+                    <span id="profileLocation">-</span>
+                </div>
+                <div class="detail-row">
+                    <span>Hospital:</span>
+                    <span id="profileHospital" style="color: var(--primary); font-weight: 600;">AI-Health Bengaluru City Hospital</span>
+                </div>
+                <div class="detail-row">
+                    <span>Assigned Specialist:</span>
+                    <span id="profileDoctor" style="color: var(--primary); font-weight: 600;">Not assigned</span>
+                </div>
+                <div class="detail-row" style="border-bottom: none; margin-top: 10px; background: #f8fafc; padding: 10px; border-radius: 6px;">
+                    <span style="color: var(--primary);">Current Appointment:</span>
+                    <span style="color: var(--primary); font-weight: bold;" id="profileAppointmentStatus">No active routine booking</span>
+                </div>
+            </div>
+
+            <button class="close-modal-btn" onclick="toggleProfileModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const userName = localStorage.getItem('registeredPatientName');
+            const userEmail = localStorage.getItem('registeredPatientEmail');
+            const userPhone = localStorage.getItem('registeredPatientPhone');
+            const userLocation = localStorage.getItem('registeredPatientLocation');
+
+            if (!userName) {
+                window.location.href = '/index.html';
+                return;
+            }
+
+            document.getElementById('profileName').innerText = userName;
+            document.getElementById('profileEmail').innerText = userEmail || 'Not provided';
+            document.getElementById('profilePhone').innerText = userPhone || 'Not provided';
+            document.getElementById('profileLocation').innerText = userLocation || 'Not provided';
+
+            const activeAppointment = localStorage.getItem('activeAppointment');
+            const statusSpan = document.getElementById('profileAppointmentStatus');
+            
+            if (activeAppointment) {
+                statusSpan.innerText = activeAppointment;
+                statusSpan.style.color = '#16a34a';
+            } else {
+                statusSpan.innerText = 'No active routine booking';
+                statusSpan.style.color = 'var(--primary)';
+            }
+
+            const assignedDoc = localStorage.getItem('assignedDoctor');
+            const doctorSpan = document.getElementById('profileDoctor');
+            if (assignedDoc) {
+                doctorSpan.innerText = assignedDoc;
+            } else {
+                doctorSpan.innerText = 'Assigned upon booking';
+            }
+        });
+
+        function toggleProfileModal() {
+            const modal = document.getElementById('profileModal');
+            modal.classList.toggle('active');
+        }
+
+        function handleModalClick(event) {
+            if (event.target.id === 'profileModal') {
+                toggleProfileModal();
+            }
+        }
+
+        function triggerEmergencySOS() {
+            alert('🚨 Emergency SOS triggered! Bypassing normal queue for immediate high-priority triage.');
+        }
+
+        function openEmergencyTriage() {
+            alert('Opening 3-state voice assistant interface...');
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/index.html';
+        }
+    </script>
+</body>
+</html>
