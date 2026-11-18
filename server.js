@@ -289,12 +289,13 @@ app.post('/api/chat', async (req, res) => {
                 return res.end();
             } catch (error) {
                 const timedOut = error.name === 'AbortError' || error.code === 'ETIMEDOUT';
-                if ((error.status !== 503 && !timedOut) || attempt === maxAttempts || hasOutput) {
+                const quotaExceeded = error.status === 429;
+                if ((error.status !== 503 && !timedOut && !quotaExceeded) || attempt === maxAttempts || hasOutput) {
                     throw error;
                 }
 
                 const delay = 500;
-                console.warn(`Gemini model ${model} is unavailable; trying fallback in ${delay}ms.`);
+                console.warn(`Gemini model ${model} is unavailable${quotaExceeded ? ' due to quota limits' : ''}; trying fallback in ${delay}ms.`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
@@ -302,6 +303,8 @@ app.post('/api/chat', async (req, res) => {
         console.error('Gemini API Exception:', error.message || error);
         const errorMessage = error.status === 503
             ? 'Gemini is temporarily overloaded. Please try again in a moment.'
+            : error.status === 429
+                ? 'The AI service quota has been reached. Please try again after the quota resets or check your Gemini API usage and billing limits.'
             : error.name === 'AbortError' || error.code === 'ETIMEDOUT'
                 ? 'The health assistant took too long to respond. Please try again.'
                 : 'Failed to communicate with AI assistant.';
@@ -312,7 +315,8 @@ app.post('/api/chat', async (req, res) => {
             }
             return;
         }
-        return res.status(error.status === 503 ? 503 : 500).json({ success: false, message: errorMessage });
+        const statusCode = error.status === 503 || error.status === 429 ? error.status : 500;
+        return res.status(statusCode).json({ success: false, message: errorMessage });
     }
 });
 

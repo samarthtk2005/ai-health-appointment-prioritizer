@@ -223,9 +223,26 @@
             transform: scale(1.05);
         }
 
+        .chat-launcher {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chat-launcher-label {
+            color: var(--primary);
+            background: white;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
         .chat-box {
             position: absolute;
-            bottom: 70px;
+            bottom: 86px;
             right: 0;
             width: 340px;
             height: 420px;
@@ -236,6 +253,10 @@
             flex-direction: column;
             overflow: hidden;
             border: 1px solid #e2e8f0;
+        }
+
+        .chat-box.hidden {
+            display: none;
         }
 
         .chat-header {
@@ -329,7 +350,7 @@
             <li>Secure Email OTP Authentication & Summary</li>
             <li>Dynamic Routine Appointment Queue Re-ordering</li>
             <li>Emergency Triage & SOS Panic Support</li>
-            <li>Real-time Gemini AI Wellness Assistant</li>
+            <li>Real-time AI Wellness Assistant (SamPrabh Health)</li>
         </ul>
 
         <button onclick="showRegistration()">Proceed to Registration</button>
@@ -410,16 +431,19 @@
     <div id="message"></div>
 </div>
 
-<!-- Gemini AI Floating Chat Widget -->
+<!-- SamPrabh Health Floating Assistant Widget -->
 <div class="chat-widget">
-    <button class="chat-toggle-btn" onclick="toggleChat()">💬</button>
+    <div class="chat-launcher">
+        <button id="chatToggleBtn" class="chat-toggle-btn" type="button" onclick="toggleChat()" aria-controls="chatBox" aria-expanded="false" aria-label="Open SamPrabh Health chat">💬</button>
+        <span class="chat-launcher-label">SamPrabh Health</span>
+    </div>
     <div id="chatBox" class="chat-box hidden">
         <div class="chat-header">
-            <span>AI Health Assistant</span>
-            <button class="close-chat" onclick="toggleChat()">&times;</button>
+            <span>SamPrabh Health</span>
+            <button class="close-chat" type="button" onclick="toggleChat()" aria-label="Close chat">&times;</button>
         </div>
         <div id="chatMessages" class="chat-messages">
-            <div class="msg bot">Hello! I am your AI health assistant. How can I help you with your health or appointment preparation today?</div>
+            <div class="msg bot">Hello! I am SamPrabh Health. How can I help with your health or appointment preparation today?</div>
         </div>
         <div class="chat-input-area">
             <input type="text" id="chatInput" placeholder="Ask a health question..." onkeypress="handleChatKey(event)">
@@ -474,6 +498,10 @@
     function toggleChat() {
         const chatBox = document.getElementById('chatBox');
         chatBox.classList.toggle('hidden');
+        const isOpen = !chatBox.classList.contains('hidden');
+        const toggleButton = document.getElementById('chatToggleBtn');
+        toggleButton.setAttribute('aria-expanded', String(isOpen));
+        toggleButton.setAttribute('aria-label', isOpen ? 'Close SamPrabh Health chat' : 'Open SamPrabh Health chat');
     }
 
     async function sendChatMessage() {
