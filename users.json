@@ -178,5 +178,15 @@
     "location": "ACS college of engineering karnataka",
     "email": "vscode087@gmail.com",
     "timestamp": "2026-11-18T16:01:26.942Z"
+  },
+  {
+    "name": "fa",
+    "age": "68",
+    "sex": "Male",
+    "phone": "9876543210",
+    "aadhaar": "[Redacted]",
+    "location": "wonderblue Garments kengeri bengaluru",
+    "email": "vscode087@gmail.com",
+    "timestamp": "2026-11-20T12:33:52.365Z"
   }
 ]
