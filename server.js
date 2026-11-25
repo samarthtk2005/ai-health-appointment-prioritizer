@@ -33,6 +33,49 @@ function isVulnerable(age) {
     return !isNaN(numAge) && (numAge < 5 || numAge > 50);
 }
 
+const HOSPITAL_COORDINATES = { latitude: 12.9716, longitude: 77.5946 };
+
+function getPatientCoordinates(patient) {
+    const location = patient && patient.location && typeof patient.location === 'object'
+        ? patient.location
+        : {};
+    const latitudeValue = patient && patient.latitude !== undefined ? patient.latitude : location.latitude;
+    const longitudeValue = patient && patient.longitude !== undefined ? patient.longitude : location.longitude;
+    if (latitudeValue === null || latitudeValue === undefined || String(latitudeValue).trim() === '' ||
+        longitudeValue === null || longitudeValue === undefined || String(longitudeValue).trim() === '') {
+        return null;
+    }
+
+    const latitude = Number(latitudeValue);
+    const longitude = Number(longitudeValue);
+
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        return null;
+    }
+
+    return { latitude, longitude };
+}
+
+function getDistanceFromHospital(patient) {
+    const coordinates = getPatientCoordinates(patient);
+    if (!coordinates) {
+        return null;
+    }
+
+    const toRadians = degrees => degrees * Math.PI / 180;
+    const latitudeDelta = toRadians(coordinates.latitude - HOSPITAL_COORDINATES.latitude);
+    const longitudeDelta = toRadians(coordinates.longitude - HOSPITAL_COORDINATES.longitude);
+    const hospitalLatitude = toRadians(HOSPITAL_COORDINATES.latitude);
+    const patientLatitude = toRadians(coordinates.latitude);
+    const haversine = Math.sin(latitudeDelta / 2) ** 2 +
+        Math.cos(hospitalLatitude) * Math.cos(patientLatitude) *
+        Math.sin(longitudeDelta / 2) ** 2;
+    const boundedHaversine = Math.min(1, Math.max(0, haversine));
+
+    return 6371 * 2 * Math.atan2(Math.sqrt(boundedHaversine), Math.sqrt(1 - boundedHaversine));
+}
+
 // Advanced Multi-Tier Queue Sorting Logic
 function sortPatientQueue(patientsList) {
     return patientsList.sort((a, b) => {
@@ -53,8 +96,19 @@ function sortPatientQueue(patientsList) {
         if (!aVulnerable && bVulnerable) {
             return 1;  // Patient B comes first
         }
+
+        // 3. For patients in the same age-priority group, prioritize those farther away.
+        const distanceA = getDistanceFromHospital(a);
+        const distanceB = getDistanceFromHospital(b);
+        if (distanceA !== null || distanceB !== null) {
+            if (distanceA === null) return 1;
+            if (distanceB === null) return -1;
+            if (distanceB !== distanceA) {
+                return distanceB - distanceA;
+            }
+        }
         
-        // 3. Final Fallback: Submission Timestamp (First-come, first-served)
+        // 4. Final Fallback: Submission Timestamp (First-come, first-served)
         const timeA = new Date(a.timestamp || Date.now()).getTime();
         const timeB = new Date(b.timestamp || Date.now()).getTime();
         return timeA - timeB;
